@@ -67,13 +67,24 @@ class PlayerMonitorThread(object):
                 or self._context.abort_requested()
                 or self.stopped())
 
+    def get_history_client(self, tracking_available):
+        context = self._context
+        provider = self._provider
+        client = provider.get_client(context)
+        if tracking_available and not client.logged_in:
+            # The resolver got signed-in tracking URLs. The service can still
+            # have the profile it loaded before the user finished signing in.
+            context.reload_access_manager()
+            client = provider.get_client(context)
+        return client
+
     def run(self):
         video_id = self.video_id
         playing_file = self.player_data.get('playing_file')
         play_count = self.player_data.get('play_count', 0)
         use_remote_history = self.player_data.get('use_remote_history', False)
         use_local_history = self.player_data.get('use_local_history', False)
-        playback_stats = self.player_data.get('playback_stats', {})
+        playback_stats = self.player_data.get('playback_stats') or {}
         refresh_only = self.player_data.get('refresh_only', False)
         clip = self.player_data.get('clip', False)
 
@@ -105,12 +116,13 @@ class PlayerMonitorThread(object):
                 'status': self.video_status,
             })
 
-        client = provider.get_client(context)
-        logged_in = client.logged_in
         report_url = use_remote_history and playback_stats.get('playback_url')
+        watchtime_url = use_remote_history and playback_stats.get('watchtime_url')
+        client = self.get_history_client(report_url or watchtime_url)
+        logged_in = client.logged_in
         state = 'playing'
 
-        if report_url:
+        if logged_in and report_url:
             client.update_watch_history(
                 video_id,
                 report_url,
@@ -121,7 +133,7 @@ class PlayerMonitorThread(object):
         playlist_player = context.get_playlist_player()
 
         video_id_param = 'video_id=%s' % video_id
-        report_url = use_remote_history and playback_stats.get('watchtime_url')
+        report_url = watchtime_url
 
         segment_start = 0.0
         report_time = -1.0

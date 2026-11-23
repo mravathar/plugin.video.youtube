@@ -1,3 +1,7 @@
+## v7.4.4+fork.1
+### Fixed
+- Recover watch history when the background service still considers the user signed out after login.
+
 ## v7.4.4
 ### Fixed
 - Fix not including FolderPath in current container details #1467
